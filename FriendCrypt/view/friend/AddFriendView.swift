@@ -170,7 +170,7 @@ struct AddFriendView: View {
                 return nil
             }
             
-            var currentData = currentUserDoc.data() ?? [:]
+            let currentData = currentUserDoc.data() ?? [:]
             var friendRequests = currentData["friend_requests"] as? [String] ?? []
             var friends = currentData["friends"] as? [String] ?? []
             

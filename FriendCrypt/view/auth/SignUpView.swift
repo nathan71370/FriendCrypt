@@ -9,7 +9,7 @@ import SwiftUI
 import FirebaseAuth
 
 // Extend String to conform to Identifiable
-extension String: Identifiable {
+extension String: @retroactive Identifiable {
     public var id: String { self }
 }
 
