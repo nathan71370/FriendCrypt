@@ -1,14 +1,22 @@
-// Firebase v2 Functions
-const { onDocumentDeleted, onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
+// Firebase Functions v2
+const {
+  onDocumentDeleted,
+  onDocumentCreated,
+  onDocumentUpdated
+} = require("firebase-functions/v2/firestore");
 // Import global options setter from the v2 API
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
+
+// Initialize the Admin SDK
 admin.initializeApp();
 
-// Global options (region is from your existing code)
+// Set your desired region (change if needed)
 setGlobalOptions({ region: "europe-west9" });
 
-// 1) Delete message subcollection when conversation is deleted (existing logic).
+/**
+ * 1) When a conversation doc is deleted, remove all message docs in 'messages' subcollection.
+ */
 exports.deleteMessagesOnConversationDelete = onDocumentDeleted(
   "conversations/{conversationId}",
   async (event) => {
@@ -28,34 +36,30 @@ exports.deleteMessagesOnConversationDelete = onDocumentDeleted(
   }
 );
 
-/**
- * Recursively deletes the documents from the provided query in batches.
- */
+// Helper: recursively delete docs in batch
 async function deleteQueryBatch(query) {
   const snapshot = await query.get();
   if (snapshot.empty) {
     return;
   }
-
   const batch = admin.firestore().batch();
   snapshot.docs.forEach((doc) => {
     batch.delete(doc.ref);
   });
   await batch.commit();
-
-  // Recursively process the next batch.
+  // Recurse
   return deleteQueryBatch(query);
 }
 
-/**
- * Initiates deletion of a collection using a batched approach.
- */
 async function deleteCollection(collectionRef, batchSize) {
   const query = collectionRef.orderBy("__name__").limit(batchSize);
   return deleteQueryBatch(query);
 }
 
-// 2) Send push notifications on new messages in "conversations/{conversationId}/messages/{messageId}"
+/**
+ * 2) Send push notifications for new messages.
+ *    Triggered by doc creation in 'conversations/{conversationId}/messages/{messageId}'.
+ */
 exports.sendMessageNotification = onDocumentCreated(
   "conversations/{conversationId}/messages/{messageId}",
   async (event) => {
@@ -64,35 +68,41 @@ exports.sendMessageNotification = onDocumentCreated(
       console.log("No message data found.");
       return;
     }
+
     const { senderId, text } = messageData;
     const conversationId = event.params.conversationId;
 
-    // 1. Get conversation doc to see participants
-    const convoRef = admin.firestore().collection("conversations").doc(conversationId);
+    // 1. Load the conversation doc
+    const convoRef = admin
+      .firestore()
+      .collection("conversations")
+      .doc(conversationId);
     const convoSnap = await convoRef.get();
     if (!convoSnap.exists) return;
-    const convo = convoSnap.data();
-    const participants = convo.participants || [];
-    
-    // 2. Filter out the sender
-    const recipients = participants.filter((uid) => uid !== senderId);
-    if (recipients.length === 0) return;
 
-    // 3. Get each recipient's fcmToken
+    const convo = convoSnap.data() || {};
+    const participants = convo.participants || [];
+
+    // 2. Exclude the sender
+    const recipientIds = participants.filter((uid) => uid !== senderId);
+    if (recipientIds.length === 0) return;
+
+    // 3. Fetch tokens for each recipient
     const tokens = [];
-    for (const uid of recipients) {
+    for (const uid of recipientIds) {
       const userDoc = await admin.firestore().collection("users").doc(uid).get();
-      if (userDoc.exists) {
-        const userData = userDoc.data();
-        if (userData.fcmToken) {
-          tokens.push(userData.fcmToken);
-        }
+      if (!userDoc.exists) continue;
+      const userData = userDoc.data();
+      if (userData.fcmToken) {
+        tokens.push(userData.fcmToken);
       }
     }
     if (tokens.length === 0) return;
 
-    // 4. Build notification payload
-    const payload = {
+    // 4. Prepare a single "multicast" message
+    //    'sendEachForMulticast' can handle multiple tokens in one call.
+    const multicastMessage = {
+      tokens, // array of FCM tokens
       notification: {
         title: "New Message",
         body: text || "You have a new message.",
@@ -103,18 +113,28 @@ exports.sendMessageNotification = onDocumentCreated(
       },
     };
 
-    // 5. Send push
+    // 5. Send with sendEachForMulticast
     try {
-      const response = await admin.messaging().sendToDevice(tokens, payload);
-      console.log("Sent message push:", response);
+      const response = await admin.messaging().sendEachForMulticast(
+        multicastMessage
+      );
+      console.log("sendMessageNotification response:", response);
+
+      // Check for per-token errors
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          console.error(`Error sending to token[${idx}]:`, resp.error);
+        }
+      });
     } catch (err) {
-      console.error("Error sending push:", err);
+      console.error("Error sending message push:", err);
     }
   }
 );
 
-// 3) Send push notifications for new friend requests
-//    We detect newly added IDs in "friend_requests" array in user doc updates.
+/**
+ * 3) Detect newly added friend requests in 'users/{userId}' doc updates.
+ */
 exports.onFriendRequestsUpdate = onDocumentUpdated("users/{userId}", async (event) => {
   const beforeData = event.data?.before?.data() || {};
   const afterData = event.data?.after?.data() || {};
@@ -123,31 +143,29 @@ exports.onFriendRequestsUpdate = onDocumentUpdated("users/{userId}", async (even
   const oldRequests = beforeData.friend_requests || [];
   const newRequests = afterData.friend_requests || [];
 
-  // Identify newly added friend request IDs
-  const addedRequests = newRequests.filter((uid) => !oldRequests.includes(uid));
+  // Identify newly added requests
+  const addedRequests = newRequests.filter((r) => !oldRequests.includes(r));
   if (addedRequests.length === 0) return;
 
-  // The userId is the one who received these friend requests
-  // We fetch userId's doc to get their fcmToken
+  // The userId doc is receiving these new requests
   const userSnap = await admin.firestore().collection("users").doc(userId).get();
   if (!userSnap.exists) return;
   const userData = userSnap.data();
   const userToken = userData.fcmToken;
   if (!userToken) return;
 
-  // For simplicity, handle only the first newly added request:
+  // We'll handle the first newly added request
   const requesterId = addedRequests[0];
-
-  // Optionally fetch the requester's username
   let requesterName = requesterId;
-  const requesterDoc = await admin.firestore().collection("users").doc(requesterId).get();
-  if (requesterDoc.exists) {
-    const rData = requesterDoc.data();
+  const reqDoc = await admin.firestore().collection("users").doc(requesterId).get();
+  if (reqDoc.exists) {
+    const rData = reqDoc.data();
     requesterName = rData.username || requesterName;
   }
 
-  // Build notification
-  const payload = {
+  // Build a single "multicast" message (even though it's just 1 token)
+  const multicastMessage = {
+    tokens: [userToken],
     notification: {
       title: "New Friend Request",
       body: `${requesterName} sent you a friend request.`,
@@ -157,49 +175,56 @@ exports.onFriendRequestsUpdate = onDocumentUpdated("users/{userId}", async (even
     },
   };
 
-  // Send push
   try {
-    const response = await admin.messaging().sendToDevice(userToken, payload);
-    console.log("Sent friend request notification:", response);
+    const response = await admin.messaging().sendEachForMulticast(multicastMessage);
+    console.log("onFriendRequestsUpdate response:", response);
+    response.responses.forEach((resp, idx) => {
+      if (!resp.success) {
+        console.error(`Error sending friend request push[${idx}]:`, resp.error);
+      }
+    });
   } catch (err) {
-    console.error("Error sending friend request notification:", err);
+    console.error("Error sending friend request push:", err);
   }
 });
 
-// 4) Send push notifications when a friend request is accepted
-//    We detect newly added friend IDs in "friends" array. For each new friend, notify them.
+/**
+ * 4) Detect newly accepted friends in 'users/{userId}' doc updates.
+ */
 exports.onFriendsUpdate = onDocumentUpdated("users/{userId}", async (event) => {
   const beforeData = event.data?.before?.data() || {};
   const afterData = event.data?.after?.data() || {};
-  const userId = event.params.userId; // the user who accepted a friend request
+  const userId = event.params.userId; // user who accepted
 
   const oldFriends = beforeData.friends || [];
   const newFriends = afterData.friends || [];
 
-  // Identify newly added friend IDs
-  const addedFriends = newFriends.filter((uid) => !oldFriends.includes(uid));
+  // Newly accepted friend IDs
+  const addedFriends = newFriends.filter((f) => !oldFriends.includes(f));
   if (addedFriends.length === 0) return;
 
-  // We'll assume the first newly added ID is the friend who was accepted
+  // We'll handle just the first newly added friend
   const acceptedUid = addedFriends[0];
 
-  // Load the user who accepted
-  const userSnap = await admin.firestore().collection("users").doc(userId).get();
-  if (!userSnap.exists) return;
-  const userData = userSnap.data();
-  const acceptingUsername = userData.username || userId;
+  // The user doc for the acceptor
+  const acceptorSnap = await admin.firestore().collection("users").doc(userId).get();
+  if (!acceptorSnap.exists) return;
+  const acceptorData = acceptorSnap.data();
+  const acceptorName = acceptorData.username || userId;
 
-  // We want to notify the acceptedUid
+  // The user doc for the accepted
   const acceptedSnap = await admin.firestore().collection("users").doc(acceptedUid).get();
   if (!acceptedSnap.exists) return;
-  const acceptedUserData = acceptedSnap.data();
-  const acceptedToken = acceptedUserData.fcmToken;
+  const acceptedData = acceptedSnap.data();
+  const acceptedToken = acceptedData.fcmToken;
   if (!acceptedToken) return;
 
-  const payload = {
+  // Single multicast message
+  const multicastMessage = {
+    tokens: [acceptedToken],
     notification: {
       title: "Friend Request Accepted",
-      body: `${acceptingUsername} accepted your friend request!`,
+      body: `${acceptorName} accepted your friend request!`,
     },
     data: {
       friendId: userId,
@@ -207,9 +232,14 @@ exports.onFriendsUpdate = onDocumentUpdated("users/{userId}", async (event) => {
   };
 
   try {
-    const response = await admin.messaging().sendToDevice(acceptedToken, payload);
-    console.log("Sent friend acceptance notification:", response);
+    const response = await admin.messaging().sendEachForMulticast(multicastMessage);
+    console.log("onFriendsUpdate response:", response);
+    response.responses.forEach((resp, idx) => {
+      if (!resp.success) {
+        console.error(`Error sending friend acceptance push[${idx}]:`, resp.error);
+      }
+    });
   } catch (err) {
-    console.error("Error sending friend acceptance notification:", err);
+    console.error("Error sending acceptance notification:", err);
   }
 });

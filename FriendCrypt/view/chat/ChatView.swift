@@ -42,14 +42,40 @@ struct ChatView: View {
     
     var body: some View {
         VStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(chatVM.messages) { message in
-                        messageBubble(message)
+            // Use ScrollViewReader to scroll programmatically.
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(chatVM.messages) { message in
+                            messageBubble(message)
+                                .id(message.id)
+                                // When the oldest message appears, load more if available.
+                                .onAppear {
+                                    if message.id == chatVM.messages.first?.id {
+                                        chatVM.loadMoreMessages()
+                                    }
+                                }
+                        }
+                    }
+                    .padding()
+                }
+                .onAppear {
+                    DispatchQueue.main.async {
+                        if let lastMessage = chatVM.messages.last {
+                            scrollProxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
-                .padding()
+                .onChange(of: chatVM.messages.count) {
+                    if let lastMessage = chatVM.messages.last {
+                        withAnimation {
+                            scrollProxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
             }
+            
+            // Message input area.
             HStack {
                 TextField("Message...", text: $messageText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -78,42 +104,34 @@ struct ChatView: View {
         }
         .onAppear {
             if let _ = authVM.user {
-                // if needed, fetch user data for the conversation participants
+                // If needed, you can fetch additional user data here.
             }
         }
     }
     
-    /// A helper to build a single message bubble with:
-    /// - Name on top (if from someone else)
-    /// - Bubble in middle
-    /// - Timestamp below
+    /// A helper to build a single message bubble.
     private func messageBubble(_ message: Message) -> some View {
         let isCurrentUser = (message.senderId == authVM.user?.id)
         let senderName = userLookupVM.username(for: message.senderId)
         let dateText = formattedDate(message.timestamp)
         
         return VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
-            // Show the sender's name if it's not the current user.
-            // If you want your own name on top as well, remove the 'if'.
             if !isCurrentUser {
                 Text(senderName)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
-            // The message bubble itself
             Text(message.text)
                 .padding()
                 .background(isCurrentUser ? Color.blue : Color.gray.opacity(0.2))
                 .foregroundColor(isCurrentUser ? .white : .primary)
                 .cornerRadius(12)
             
-            // The timestamp below the message bubble, aligned similarly
             Text(dateText)
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
-        // Align everything to the left if it's someone else, to the right if it's current user
         .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
     }
     
