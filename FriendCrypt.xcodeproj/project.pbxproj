@@ -10,6 +10,7 @@
 		991855872D567E1B00BC6F7A /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 991855862D567E1B00BC6F7A /* FirebaseCore */; };
 		9918558F2D568FD600BC6F7A /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 9918558E2D568FD600BC6F7A /* FirebaseFirestore */; };
 		991855A52D5691EF00BC6F7A /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 991855A42D5691EF00BC6F7A /* FirebaseAuth */; };
+		992245992D58FBCD0093D5F0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 992245982D58FBCD0093D5F0 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +34,7 @@
 		991855502D564ADE00BC6F7A /* FriendCrypt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FriendCrypt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		991855632D564ADF00BC6F7A /* FriendCryptTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FriendCryptTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9918556D2D564ADF00BC6F7A /* FriendCryptUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FriendCryptUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		992245982D58FBCD0093D5F0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -89,6 +91,7 @@
 				991855702D564ADF00BC6F7A /* FriendCryptUITests */,
 				991855852D567E1B00BC6F7A /* Frameworks */,
 				991855512D564ADE00BC6F7A /* Products */,
+				992245982D58FBCD0093D5F0 /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -116,6 +119,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 991855772D564ADF00BC6F7A /* Build configuration list for PBXNativeTarget "FriendCrypt" */;
 			buildPhases = (
+				992245972D58F0BB0093D5F0 /* ShellScript */,
 				9918554C2D564ADE00BC6F7A /* Sources */,
 				9918554D2D564ADE00BC6F7A /* Frameworks */,
 				9918554E2D564ADE00BC6F7A /* Resources */,
@@ -235,6 +239,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				992245992D58FBCD0093D5F0 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -253,6 +258,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		992245972D58F0BB0093D5F0 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/sh\n\necho \"Running pre-build script to inject GoogleService-Info.plist...\"\n\nif [ -n \"$GOOGLE_SERVICE_INFO_PLIST_BASE64\" ]; then\n    echo \"GOOGLE_SERVICE_INFO_PLIST_BASE64 is set. Decoding...\"\n    echo \"$GOOGLE_SERVICE_INFO_PLIST_BASE64\" | base64 --decode > \"${SRCROOT}/GoogleService-Info.plist\"\n    if [ $? -eq 0 ]; then\n      echo \"GoogleService-Info.plist created successfully.\"\n      ls -l \"${SRCROOT}/GoogleService-Info.plist\"\n    else\n      echo \"Error: Failed to decode and write GoogleService-Info.plist\"\n      exit 1\n    fi\nelif [ -f \"${SRCROOT}/GoogleService-Info.plist\" ]; then\n    echo \"GoogleService-Info.plist already exists locally. Skipping injection.\"\nelse\n    echo \"Warning: GOOGLE_SERVICE_INFO_PLIST_BASE64 is not set and GoogleService-Info.plist is missing.\"\n    # Optionally, you can exit 1 here if you want the build to fail.\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9918554C2D564ADE00BC6F7A /* Sources */ = {

@@ -15,39 +15,48 @@ class AuthViewModel: ObservableObject {
     @Published var isLoggedIn = false
     @Published var signupError: String? = nil  // To hold signup error messages
     
+    private var userListener: ListenerRegistration?
+    
     init() {
-        // Listen for changes to the auth state.
         Auth.auth().addStateDidChangeListener { auth, fbUser in
             if let fbUser = fbUser {
                 self.isLoggedIn = true
-                // Fetch the user's document from Firestore.
-                Firestore.firestore().collection("users").document(fbUser.uid).getDocument { snapshot, error in
+                // Instead of a single getDocument, set up a snapshot listener:
+                let userRef = Firestore.firestore().collection("users").document(fbUser.uid)
+                
+                // Remove any old listener first, in case user changes.
+                self.userListener?.remove()
+                
+                self.userListener = userRef.addSnapshotListener { snapshot, error in
                     if let error = error {
-                        print("Error fetching user document: \(error.localizedDescription)")
+                        print("Error listening to user doc: \(error)")
                         return
                     }
                     
                     guard let snapshot = snapshot, snapshot.exists else {
-                        print("User document does not exist for uid \(fbUser.uid)")
+                        print("User doc does not exist for uid: \(fbUser.uid)")
                         return
                     }
                     
                     do {
-                        // Use the snapshot.data(as:) method to automatically decode and inject the document ID.
                         let chatUser = try snapshot.data(as: ChatUser.self)
                         DispatchQueue.main.async {
                             self.user = chatUser
                         }
                     } catch {
-                        print("Error decoding user: \(error.localizedDescription)")
+                        print("Error decoding user: \(error)")
                     }
                 }
             } else {
                 self.isLoggedIn = false
                 self.user = nil
+                // Remove any snapshot listener if user logs out
+                self.userListener?.remove()
+                self.userListener = nil
             }
         }
     }
+    
     
     func signIn(email: String, password: String) {
         Auth.auth().signIn(withEmail: email, password: password) { result, error in

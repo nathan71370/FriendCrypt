@@ -84,8 +84,8 @@ struct FriendView: View {
                 friendVM.fetchFriends(for: currentUser)
             }
         }
-        .onReceive(authVM.$user) { user in
-            if let user = user {
+        .onReceive(authVM.$user) { newUser in
+            if let user = newUser {
                 friendVM.fetchFriends(for: user)
             }
         }
