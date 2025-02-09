@@ -10,7 +10,7 @@
 		991855872D567E1B00BC6F7A /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 991855862D567E1B00BC6F7A /* FirebaseCore */; };
 		9918558F2D568FD600BC6F7A /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 9918558E2D568FD600BC6F7A /* FirebaseFirestore */; };
 		991855A52D5691EF00BC6F7A /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 991855A42D5691EF00BC6F7A /* FirebaseAuth */; };
-		992245992D58FBCD0093D5F0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 992245982D58FBCD0093D5F0 /* GoogleService-Info.plist */; };
+		992245A22D59206D0093D5F0 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 992245A12D59206D0093D5F0 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,12 +34,24 @@
 		991855502D564ADE00BC6F7A /* FriendCrypt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FriendCrypt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		991855632D564ADF00BC6F7A /* FriendCryptTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FriendCryptTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9918556D2D564ADF00BC6F7A /* FriendCryptUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FriendCryptUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		992245982D58FBCD0093D5F0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		9922459E2D591C4E0093D5F0 /* Exceptions for "FriendCrypt" folder in "FriendCrypt" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9918554F2D564ADE00BC6F7A /* FriendCrypt */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		991855522D564ADE00BC6F7A /* FriendCrypt */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9922459E2D591C4E0093D5F0 /* Exceptions for "FriendCrypt" folder in "FriendCrypt" target */,
+			);
 			path = FriendCrypt;
 			sourceTree = "<group>";
 		};
@@ -60,6 +72,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				992245A22D59206D0093D5F0 /* FirebaseMessaging in Frameworks */,
 				991855872D567E1B00BC6F7A /* FirebaseCore in Frameworks */,
 				991855A52D5691EF00BC6F7A /* FirebaseAuth in Frameworks */,
 				9918558F2D568FD600BC6F7A /* FirebaseFirestore in Frameworks */,
@@ -91,7 +104,6 @@
 				991855702D564ADF00BC6F7A /* FriendCryptUITests */,
 				991855852D567E1B00BC6F7A /* Frameworks */,
 				991855512D564ADE00BC6F7A /* Products */,
-				992245982D58FBCD0093D5F0 /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -119,7 +131,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 991855772D564ADF00BC6F7A /* Build configuration list for PBXNativeTarget "FriendCrypt" */;
 			buildPhases = (
-				992245972D58F0BB0093D5F0 /* ShellScript */,
 				9918554C2D564ADE00BC6F7A /* Sources */,
 				9918554D2D564ADE00BC6F7A /* Frameworks */,
 				9918554E2D564ADE00BC6F7A /* Resources */,
@@ -136,6 +147,7 @@
 				991855862D567E1B00BC6F7A /* FirebaseCore */,
 				9918558E2D568FD600BC6F7A /* FirebaseFirestore */,
 				991855A42D5691EF00BC6F7A /* FirebaseAuth */,
+				992245A12D59206D0093D5F0 /* FirebaseMessaging */,
 			);
 			productName = Friendly;
 			productReference = 991855502D564ADE00BC6F7A /* FriendCrypt.app */;
@@ -239,7 +251,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				992245992D58FBCD0093D5F0 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -258,28 +269,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		992245972D58F0BB0093D5F0 /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "#!/bin/sh\n\necho \"Running pre-build script to inject GoogleService-Info.plist...\"\n\nif [ -n \"$GOOGLE_SERVICE_INFO_PLIST_BASE64\" ]; then\n    echo \"GOOGLE_SERVICE_INFO_PLIST_BASE64 is set. Decoding...\"\n    \n    # Define the temporary path using the DERIVED_FILE_DIR\n    TEMP_PLIST_PATH=\"${DERIVED_FILE_DIR}/GoogleService-Info.plist\"\n    \n    # Create the directory if it does not exist\n    mkdir -p \"$(dirname \"$TEMP_PLIST_PATH\")\"\n    \n    # Decode the Base64 string into the temporary file\n    echo \"$GOOGLE_SERVICE_INFO_PLIST_BASE64\" | base64 --decode > \"$TEMP_PLIST_PATH\"\n    \n    if [ $? -eq 0 ]; then\n        echo \"GoogleService-Info.plist created successfully at $TEMP_PLIST_PATH\"\n        ls -l \"$TEMP_PLIST_PATH\"\n        \n        echo \"Copying GoogleService-Info.plist into bundle resources...\"\n        cp \"$TEMP_PLIST_PATH\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"\n        if [ $? -eq 0 ]; then\n            echo \"GoogleService-Info.plist copied successfully to bundle resources.\"\n        else\n            echo \"Error: Failed to copy GoogleService-Info.plist to bundle resources.\"\n            exit 1\n        fi\n    else\n        echo \"Error: Failed to decode and write GoogleService-Info.plist\"\n        exit 1\n    fi\nelse\n    echo \"Warning: GOOGLE_SERVICE_INFO_PLIST_BASE64 is not set.\"\n    echo \"If you're building locally, please ensure that a local copy of GoogleService-Info.plist exists in your project.\"\n    # Uncomment the next line if you want the build to fail when the secret is missing:\n    # exit 1\nfi\n";
-			showEnvVarsInLog = 0;
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9918554C2D564ADE00BC6F7A /* Sources */ = {
@@ -446,6 +435,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FriendCrypt/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FriendCrypt;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -488,6 +478,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FriendCrypt/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FriendCrypt;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -674,6 +665,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 991855842D56796B00BC6F7A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		992245A12D59206D0093D5F0 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 991855842D56796B00BC6F7A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

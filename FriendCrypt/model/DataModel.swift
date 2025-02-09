@@ -14,6 +14,7 @@ struct ChatUser: Identifiable, Codable {
     var username: String
     var friend_requests: [String] = []
     var friends: [String] = []
+    var fcmToken: String?
 }
 
 // A conversation between two (or more) users (stored in "conversations")

@@ -10,10 +10,7 @@ import FirebaseCore
 
 @main
 struct FriendCryptApp: App {
-    // Initialize Firebase when the app starts.
-    init() {
-        FirebaseApp.configure()
-    }
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
         WindowGroup {
