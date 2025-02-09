@@ -19,6 +19,8 @@ extension Array {
 }
 
 class FriendViewModel: ObservableObject {
+    @ObservedObject var authVM = AuthViewModel.shared
+    
     @Published var friends: [ChatUser] = []
     @Published var isLoading = false
     
@@ -92,5 +94,13 @@ class FriendViewModel: ObservableObject {
                 print("Error removing current user from friend's list: \(error.localizedDescription)")
             }
         }
+    }
+    
+    /// Helper function to return the friend's display name for a conversation.
+    func friendName(for convo: Conversation) -> String {
+        guard let currentUserId = authVM.user?.id else { return "Unknown" }
+        let friendIds = convo.participants.filter { $0 != currentUserId }
+        guard let friendId = friendIds.first else { return "Unknown" }
+        return self.friends.first(where: { $0.id == friendId })?.username ?? friendId
     }
 }

@@ -11,7 +11,8 @@ struct ConversationInfoView: View {
     let conversationId: String
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var convDetailVM = ConversationDetailViewModel(conversationId: "")
-    @StateObject private var friendVM = FriendViewModel()  // For looking up participant names
+    @StateObject private var friendVM = FriendViewModel()
+    @StateObject private var userLookupVM = UserLookupViewModel()
     @State private var showAddFriendSheet = false
     @Environment(\.dismiss) var dismiss
     
@@ -31,7 +32,7 @@ struct ConversationInfoView: View {
                                 Text(authVM.user?.username ?? participantId)
                             } else {
                                 // Otherwise, look it up in friendVM.friends.
-                                Text(friendVM.friends.first(where: { $0.id == participantId })?.username ?? participantId)
+                                Text(userLookupVM.username(for: participantId))
                             }
                         }
                     } else {

@@ -121,6 +121,17 @@ struct AddFriendView: View {
                     return
                 }
                 
+                if (friendDoc["friend_requests"] as? [String] ?? []).contains(currentUser.uid) {
+                    // The target user has already sent you a friend request, so auto-accept for both sides.
+                    autoAcceptMutualRequest(currentUserId: currentUser.uid, friendId: friendDoc.documentID)
+                    alertData = AlertData(
+                        title: "You Are Now Friends!",
+                        message: "The user had already sent you a request, so we accepted automatically.",
+                        isError: false
+                    )
+                    return
+                }
+                
                 db.collection("users").document(friendDoc.documentID).updateData([
                     "friend_requests": FieldValue.arrayUnion([currentUser.uid])
                 ]) { error in
@@ -141,5 +152,52 @@ struct AddFriendView: View {
                     }
                 }
             }
+    }
+    
+    func autoAcceptMutualRequest(currentUserId: String, friendId: String) {
+        let db = Firestore.firestore()
+        
+        let currentUserRef = db.collection("users").document(currentUserId)
+        let friendUserRef = db.collection("users").document(friendId)
+        
+        // Transaction to update your own user: remove friendId from friend_requests and add to friends.
+        db.runTransaction({ transaction, errorPointer in
+            let currentUserDoc: DocumentSnapshot
+            do {
+                currentUserDoc = try transaction.getDocument(currentUserRef)
+            } catch let error as NSError {
+                errorPointer?.pointee = error
+                return nil
+            }
+            
+            var currentData = currentUserDoc.data() ?? [:]
+            var friendRequests = currentData["friend_requests"] as? [String] ?? []
+            var friends = currentData["friends"] as? [String] ?? []
+            
+            friendRequests.removeAll(where: { $0 == friendId })
+            if !friends.contains(friendId) {
+                friends.append(friendId)
+            }
+            
+            transaction.updateData([
+                "friend_requests": friendRequests,
+                "friends": friends
+            ], forDocument: currentUserRef)
+            
+            return nil
+        }, completion: { error, _ in
+            if let error = error {
+                print("Auto-accept transaction failed: \(error)")
+            }
+        })
+        
+        // Also add your id to the friend's "friends" array.
+        friendUserRef.updateData([
+            "friends": FieldValue.arrayUnion([currentUserId])
+        ]) { error in
+            if let error = error {
+                print("Error auto-updating the friend's document: \(error.localizedDescription)")
+            }
+        }
     }
 }

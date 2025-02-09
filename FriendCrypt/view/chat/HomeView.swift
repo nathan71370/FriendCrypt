@@ -22,8 +22,14 @@ struct HomeView: View {
                 ForEach(conversationsVM.conversations) { convo in
                     NavigationLink(destination: ChatView(conversationId: convo.id ?? "")) {
                         VStack(alignment: .leading) {
-                            Text("Conversation with: \(friendName(for: convo))")
-                                .font(.headline)
+                            if convo.participants.count == 2 {
+                                Text("\(friendVM.friendName(for: convo))")
+                                    .font(.headline)
+                            } else if convo.participants.count == 1 {
+                                Text(authVM.user?.username ?? "Chat").font(.headline)
+                            } else {
+                                Text("\(convo.participants.count) people").font(.headline)
+                            }
                             Text(convo.lastMessage)
                                 .font(.subheadline)
                         }
@@ -90,13 +96,5 @@ struct HomeView: View {
                 conversationsVM.stopListening()
             }
         }
-    }
-    
-    /// Helper function to return the friend's display name for a conversation.
-    private func friendName(for convo: Conversation) -> String {
-        guard let currentUserId = authVM.user?.id else { return "Unknown" }
-        let friendIds = convo.participants.filter { $0 != currentUserId }
-        guard let friendId = friendIds.first else { return "Unknown" }
-        return friendVM.friends.first(where: { $0.id == friendId })?.username ?? friendId
     }
 }
