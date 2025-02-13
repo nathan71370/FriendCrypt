@@ -4,6 +4,13 @@
 //
 //  Created by Nathan Mercier on 07/02/2025.
 //
+//
+//  FriendView.swift
+//  Friendly
+//
+//  Created by Nathan Mercier on 07/02/2025.
+//
+
 import SwiftUI
 
 extension Notification.Name {
@@ -12,7 +19,7 @@ extension Notification.Name {
 
 struct FriendView: View {
     @EnvironmentObject var authVM: AuthViewModel
-    @StateObject var friendVM = FriendViewModel()
+    @EnvironmentObject var friendVM: FriendViewModel
     @State private var showAddFriend = false
     @State private var showFriendRequests = false
     @State private var friendToDelete: ChatUser? = nil
@@ -23,7 +30,7 @@ struct FriendView: View {
                 if friendVM.friends.isEmpty {
                     Text("No friends yet")
                 } else {
-                    ForEach(friendVM.friends) { friend in
+                    ForEach(Array(friendVM.friends.values), id: \.id) { friend in
                         NavigationLink(destination: FriendDetailView(friend: friend)) {
                             FriendRow(friend: friend)
                         }
@@ -69,6 +76,7 @@ struct FriendView: View {
                     primaryButton: .destructive(Text("Delete")) {
                         if let currentUser = authVM.user, let friendID = friend.id {
                             friendVM.deleteFriend(friend: friend, currentUser: currentUser)
+                            // Update the current user's friend list locally
                             var updatedUser = currentUser
                             updatedUser.friends.removeAll { $0 == friendID }
                             authVM.user = updatedUser

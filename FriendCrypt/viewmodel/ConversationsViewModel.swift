@@ -10,12 +10,11 @@ import FirebaseAuth
 import FirebaseFirestore
 
 class ConversationsViewModel: ObservableObject {
-    @Published var conversations: [Conversation] = []
+    @Published var conversations: [String: Conversation] = [:]
     private var listener: ListenerRegistration?
     
     /// Call this when you have a valid user to start listening for conversations.
     func startListening(for user: ChatUser) {
-        // Remove any existing listener.
         listener?.remove()
         listener = nil
         
@@ -40,17 +39,15 @@ class ConversationsViewModel: ObservableObject {
                 return
             }
             
-            let convos = snapshot.documents.compactMap { document -> Conversation? in
+            _ = snapshot.documents.compactMap { document -> Conversation? in
                 do {
                     let convo = try document.data(as: Conversation.self)
+                    self.conversations[convo.id ?? ""] = convo
                     return convo
                 } catch {
                     print("Error decoding conversation: \(error.localizedDescription)")
                     return nil
                 }
-            }
-            DispatchQueue.main.async {
-                self.conversations = convos
             }
         }
     }
@@ -93,6 +90,11 @@ class ConversationsViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    /// Returns the conversation for a given conversation id.
+    func conversation(for convoId: String) -> Conversation {
+        return self.conversations[convoId]!
     }
     
     deinit {

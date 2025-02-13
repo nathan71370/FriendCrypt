@@ -4,6 +4,13 @@
 //
 //  Created by Nathan Mercier on 07/02/2025.
 //
+//
+//  NewConversationView.swift
+//  Friendly
+//
+//  Created by Nathan Mercier on 07/02/2025.
+//
+
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
@@ -12,7 +19,8 @@ struct NewConversationView: View {
     @Environment(\.presentationMode) var presentationMode
     @Binding var isPresented: Bool
     @ObservedObject var authVM = AuthViewModel.shared
-    @StateObject var friendVM = FriendViewModel()
+    // Use the shared FriendViewModel rather than a new instance.
+    @EnvironmentObject var friendVM: FriendViewModel
     @State private var selectedFriendIDs: Set<String> = []
     @State private var errorMessage: String? = nil
     
@@ -53,8 +61,8 @@ struct NewConversationView: View {
                             }
                             .padding()
                         } else {
-                            // Display the list of available friends (for selection).
-                            List(friendVM.friends, id: \.id) { friend in
+                            // Convert dictionary values to an array for display.
+                            List(Array(friendVM.friends.values), id: \.id) { friend in
                                 Button(action: {
                                     guard let friendID = friend.id else { return }
                                     if selectedFriendIDs.contains(friendID) {
@@ -106,6 +114,7 @@ struct NewConversationView: View {
         }
         .onAppear {
             if let currentUser = authVM.user {
+                // This will use the cached friend data if already loaded.
                 friendVM.fetchFriends(for: currentUser)
             }
         }

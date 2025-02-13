@@ -10,7 +10,7 @@ import SwiftUI
 struct ConversationInfoView: View {
     let conversationId: String
     @EnvironmentObject var authVM: AuthViewModel
-    @StateObject private var convDetailVM = ConversationDetailViewModel(conversationId: "")
+    @EnvironmentObject var conversationVM: ConversationsViewModel
     @StateObject private var friendVM = FriendViewModel()
     @StateObject private var userLookupVM = UserLookupViewModel()
     @State private var showAddFriendSheet = false
@@ -18,26 +18,21 @@ struct ConversationInfoView: View {
     
     init(conversationId: String) {
         self.conversationId = conversationId
-        _convDetailVM = StateObject(wrappedValue: ConversationDetailViewModel(conversationId: conversationId))
     }
     
     var body: some View {
         NavigationView {
             List {
                 Section(header: Text("Participants")) {
-                    if let conversation = convDetailVM.conversation {
-                        ForEach(conversation.participants, id: \.self) { participantId in
-                            // If this participant is the current user, show their username directly.
-                            if participantId == authVM.user?.id {
-                                Text(authVM.user?.username ?? participantId)
-                            } else {
-                                // Otherwise, look it up in friendVM.friends.
-                                Text(userLookupVM.username(for: participantId))
-                            }
+                    let conversation = conversationVM.conversation(for: conversationId)
+                    ForEach(conversation.participants, id: \.self) { participantId in
+                        if participantId == authVM.user?.id {
+                            Text(authVM.user?.username ?? participantId)
+                        } else {
+                            Text(userLookupVM.username(for: participantId))
                         }
-                    } else {
-                        Text("Loading participants...")
                     }
+                    
                 }
             }
             .navigationTitle("Conversation Info")
