@@ -64,8 +64,6 @@ struct ChatView: View {
                     }
                 }
             }
-            
-            // Message input area.
             HStack {
                 TextField("Message...", text: $messageText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())

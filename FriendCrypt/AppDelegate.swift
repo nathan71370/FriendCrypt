@@ -11,6 +11,10 @@ import FirebaseAuth
 import FirebaseMessaging
 import UserNotifications
 
+extension Notification.Name {
+    static let navigateToConversation = Notification.Name("navigateToConversation")
+}
+
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
     
     func application(
@@ -18,13 +22,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         
-        // Configure Firebase
         FirebaseApp.configure()
         
-        // Set UNUserNotificationCenter delegate
         UNUserNotificationCenter.current().delegate = self
         
-        // Request permission for alerts, sounds, and badges
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             print("Notifications permission granted: \(granted)")
             if let error = error {
@@ -32,10 +33,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             }
         }
         
-        // Register for remote notifications
         application.registerForRemoteNotifications()
         
-        // Set Firebase Messaging delegate
         Messaging.messaging().delegate = self
         
         return true
@@ -46,7 +45,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
-        // Pass APNs token to Firebase
         Messaging.messaging().apnsToken = deviceToken
     }
     
@@ -65,28 +63,21 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         guard let fcmToken = fcmToken else { return }
         print("FCM registration token: \(fcmToken)")
         
-        // Store the FCM token in Firestore under the current user's document
         storeFCMTokenInFirestore(fcmToken)
     }
     
     // MARK: - UNUserNotificationCenterDelegate
     
-    // Called when a notification is delivered to a foreground app (iOS 10+)
+    // Called when a notification is delivered to a foreground app
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        if #available(iOS 14.0, *) {
-            // Use .banner for iOS 14+, plus sound & badge
-            completionHandler([.banner, .sound, .badge])
-        } else {
-            // Fall back to .alert for older iOS
-            completionHandler([.alert, .sound, .badge])
-        }
+        completionHandler([.banner, .sound, .badge])
     }
     
-    // Called when the user taps a notification (iOS 10+)
+    // Called when the user taps a notification
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
@@ -95,7 +86,23 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         let userInfo = response.notification.request.content.userInfo
         print("User tapped notification: \(userInfo)")
         
-        // Parse userInfo keys if needed, e.g. conversationId, friendRequestId, etc.
+        if let conversationId = userInfo["conversationId"] as? String {
+            NotificationCenter.default.post(
+                name: .navigateToConversation,
+                object: nil,
+                userInfo: ["conversationId": conversationId]
+            )
+            
+            UNUserNotificationCenter.current().getDeliveredNotifications { notifications in
+                let idsToRemove = notifications.filter {
+                    if let convoId = $0.request.content.userInfo["conversationId"] as? String {
+                        return convoId == conversationId
+                    }
+                    return false
+                }.map { $0.request.identifier }
+                UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: idsToRemove)
+            }
+        }
         
         completionHandler()
     }

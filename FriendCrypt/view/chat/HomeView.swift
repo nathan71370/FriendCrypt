@@ -11,24 +11,27 @@ struct HomeView: View {
     @ObservedObject var authVM = AuthViewModel.shared
     @StateObject var conversationsVM = ConversationsViewModel()
     @StateObject var friendVM = FriendViewModel()
+    @StateObject var router = NavigationRouter() // our navigation router
     
     @State private var showFriend = false
     @State private var showNewConversation = false
     @State private var conversationToQuit: Conversation? = nil
     
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $router.path) {
             List {
                 ForEach(conversationsVM.conversations) { convo in
-                    NavigationLink(destination: ChatView(conversationId: convo.id ?? "")) {
+                    NavigationLink(value: DeepLink.conversation(id: convo.id ?? "")) {
                         VStack(alignment: .leading) {
                             if convo.participants.count == 2 {
                                 Text("\(friendVM.friendName(for: convo))")
                                     .font(.headline)
                             } else if convo.participants.count == 1 {
-                                Text(authVM.user?.username ?? "Chat").font(.headline)
+                                Text(authVM.user?.username ?? "Chat")
+                                    .font(.headline)
                             } else {
-                                Text("\(convo.participants.count) people").font(.headline)
+                                Text("\(convo.participants.count) people")
+                                    .font(.headline)
                             }
                             Text(convo.lastMessage)
                                 .font(.subheadline)
@@ -80,6 +83,18 @@ struct HomeView: View {
                     }),
                     secondaryButton: .cancel()
                 )
+            }
+            .navigationDestination(for: DeepLink.self) { link in
+                switch link {
+                case .conversation(let id):
+                    ChatView(conversationId: id)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToConversation)) { notification in
+                if let userInfo = notification.userInfo,
+                   let conversationId = userInfo["conversationId"] as? String {
+                    router.navigate(to: .conversation(id: conversationId))
+                }
             }
         }
         .onAppear {

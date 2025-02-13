@@ -72,22 +72,19 @@ exports.sendMessageNotification = onDocumentCreated(
     const { senderId, text } = messageData;
     const conversationId = event.params.conversationId;
 
-    // 1. Load the conversation doc
-    const convoRef = admin
-      .firestore()
-      .collection("conversations")
-      .doc(conversationId);
+    // 1. Load the conversation doc.
+    const convoRef = admin.firestore().collection("conversations").doc(conversationId);
     const convoSnap = await convoRef.get();
     if (!convoSnap.exists) return;
 
     const convo = convoSnap.data() || {};
     const participants = convo.participants || [];
 
-    // 2. Exclude the sender
+    // 2. Exclude the sender.
     const recipientIds = participants.filter((uid) => uid !== senderId);
     if (recipientIds.length === 0) return;
 
-    // 3. Fetch tokens for each recipient
+    // 3. Fetch tokens for each recipient.
     const tokens = [];
     for (const uid of recipientIds) {
       const userDoc = await admin.firestore().collection("users").doc(uid).get();
@@ -99,28 +96,36 @@ exports.sendMessageNotification = onDocumentCreated(
     }
     if (tokens.length === 0) return;
 
-    // 4. Prepare a single "multicast" message
-    //    'sendEachForMulticast' can handle multiple tokens in one call.
+    // 3.5 Fetch sender's username to use as the notification title.
+    let senderName = "New Message";
+    const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
+    if (senderDoc.exists) {
+      const senderData = senderDoc.data();
+      senderName = senderData.username || senderName;
+    }
+
+    // 4. Prepare the multicast message with APNs options.
     const multicastMessage = {
       tokens, // array of FCM tokens
       notification: {
-        title: "New Message",
+        title: senderName, // now shows sender’s username
         body: text || "You have a new message.",
       },
       data: {
-        conversationId,
+        conversationId, // for deep linking
         senderId,
       },
+      apns: {
+        headers: {
+          "apns-collapse-id": conversationId // collapses notifications for this conversation
+        }
+      }
     };
 
-    // 5. Send with sendEachForMulticast
+    // 5. Send the message.
     try {
-      const response = await admin.messaging().sendEachForMulticast(
-        multicastMessage
-      );
+      const response = await admin.messaging().sendEachForMulticast(multicastMessage);
       console.log("sendMessageNotification response:", response);
-
-      // Check for per-token errors
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           console.error(`Error sending to token[${idx}]:`, resp.error);
