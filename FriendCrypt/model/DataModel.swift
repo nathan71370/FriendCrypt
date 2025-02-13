@@ -26,7 +26,7 @@ struct Conversation: Identifiable, Codable {
 }
 
 // A single message in a conversation (stored in the "messages" subcollection)
-struct Message: Identifiable, Codable {
+struct Message: Identifiable, Codable, Equatable {
     @DocumentID var id: String?
     var senderId: String
     var text: String

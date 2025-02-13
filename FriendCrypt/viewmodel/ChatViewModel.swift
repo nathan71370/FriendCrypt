@@ -14,14 +14,6 @@ class ChatViewModel: ObservableObject {
     
     private let db = Firestore.firestore()
     let conversationId: String
-    
-    // Pagination properties.
-    private var lastDocument: DocumentSnapshot?
-    private var isLoading = false
-    private var hasMoreMessages = true
-    private let pageSize = 50
-
-    // Listener for realtime new messages.
     private var realtimeListener: ListenerRegistration?
     
     init(conversationId: String) {
@@ -29,71 +21,47 @@ class ChatViewModel: ObservableObject {
         loadInitialMessages()
     }
     
-    /// Loads the initial (most recent) messages.
+    /// Loads the most recent messages and starts a realtime listener.
     private func loadInitialMessages() {
-        guard !isLoading else { return }
-        isLoading = true
-        
-        // Fetch the most recent messages in descending order, then reverse for display.
         db.collection("conversations").document(conversationId)
             .collection("messages")
             .order(by: "timestamp", descending: true)
-            .limit(to: pageSize)
-            .getDocuments { snapshot, error in
-                defer { self.isLoading = false }
-                guard let snapshot = snapshot, error == nil else { return }
+            .limit(to: 50)
+            .getDocuments { [weak self] snapshot, error in
+                guard let self = self,
+                      let snapshot = snapshot,
+                      error == nil else { return }
                 
+                // Reverse the fetched messages for chronological order.
                 let fetchedMessages = snapshot.documents.compactMap { try? $0.data(as: Message.self) }
                 self.messages = fetchedMessages.reversed()
                 
-                self.lastDocument = snapshot.documents.last
-                self.hasMoreMessages = snapshot.documents.count == self.pageSize
-                
-                // Start listening for new messages once the initial batch is loaded.
+                // Start listening for new messages.
                 self.startListeningForNewMessages()
             }
     }
     
-    /// Loads more (older) messages when the user scrolls up.
-    func loadMoreMessages() {
-        guard !isLoading, hasMoreMessages, let lastDocument = lastDocument else { return }
-        isLoading = true
-        
-        db.collection("conversations").document(conversationId)
-            .collection("messages")
-            .order(by: "timestamp", descending: true)
-            .start(afterDocument: lastDocument)
-            .limit(to: pageSize)
-            .getDocuments { snapshot, error in
-                defer { self.isLoading = false }
-                guard let snapshot = snapshot, error == nil else { return }
-                
-                let fetchedMessages = snapshot.documents.compactMap { try? $0.data(as: Message.self) }
-                // Prepend older messages (after reversing them) to the array.
-                self.messages.insert(contentsOf: fetchedMessages.reversed(), at: 0)
-                
-                self.lastDocument = snapshot.documents.last
-                self.hasMoreMessages = snapshot.documents.count == self.pageSize
-            }
-    }
-    
-    /// Starts a realtime listener for new messages that arrive after the last message in the current list.
+    /// Listens for new messages arriving after the current last message.
     private func startListeningForNewMessages() {
-        // Determine the timestamp of the newest message currently loaded.
         let lastTimestamp = messages.last?.timestamp ?? Timestamp(date: Date())
-        
         realtimeListener = db.collection("conversations").document(conversationId)
             .collection("messages")
             .order(by: "timestamp", descending: false)
             .whereField("timestamp", isGreaterThan: lastTimestamp)
-            .addSnapshotListener { snapshot, error in
-                guard let snapshot = snapshot, error == nil else { return }
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self,
+                      let snapshot = snapshot,
+                      error == nil else { return }
                 
-                // Filter out documents that might already exist in your messages array.
-                let newMessages = snapshot.documents.compactMap { try? $0.data(as: Message.self) }
-                // Append and sort (if needed) to ensure proper order.
-                self.messages.append(contentsOf: newMessages)
-                self.messages.sort { $0.timestamp.dateValue() < $1.timestamp.dateValue() }
+                DispatchQueue.main.async {
+                    snapshot.documentChanges.forEach { change in
+                        if change.type == .added,
+                           let newMessage = try? change.document.data(as: Message.self),
+                           !self.messages.contains(where: { $0.id == newMessage.id }) {
+                            self.messages.append(newMessage)
+                        }
+                    }
+                }
             }
     }
     
@@ -107,6 +75,7 @@ class ChatViewModel: ObservableObject {
             _ = try db.collection("conversations").document(conversationId)
                 .collection("messages").addDocument(from: newMessage)
             
+            // Optionally update conversation metadata.
             db.collection("conversations").document(conversationId).updateData([
                 "lastMessage": text,
                 "timestamp": Timestamp()

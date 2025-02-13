@@ -10,66 +10,56 @@ import FirebaseFirestore
 
 struct ChatView: View {
     let conversationId: String
-    @ObservedObject var chatVM: ChatViewModel
+    @StateObject private var chatVM: ChatViewModel
     @State private var messageText = ""
-    @ObservedObject var authVM = AuthViewModel.shared
+    @ObservedObject private var authVM = AuthViewModel.shared
     @StateObject private var convDetailVM: ConversationDetailViewModel
     @StateObject private var userLookupVM = UserLookupViewModel()
     
     @State private var showInfoSheet = false
-    
+    @State private var initialLoadCompleted = false
+
     init(conversationId: String) {
         self.conversationId = conversationId
-        self.chatVM = ChatViewModel(conversationId: conversationId)
+        _chatVM = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId))
         _convDetailVM = StateObject(wrappedValue: ConversationDetailViewModel(conversationId: conversationId))
     }
     
+    /// Computes the navigation title based on conversation details.
     private var navigationTitle: String {
-        if let conversation = convDetailVM.conversation {
-            let count = conversation.participants.count
-            if count == 2 {
-                guard let currentUserId = authVM.user?.id else { return "Chat" }
-                let friendId = conversation.participants.first { $0 != currentUserId } ?? "Unknown"
-                return userLookupVM.username(for: friendId)
-            } else if count == 1 {
-                return authVM.user?.username ?? "Chat"
-            } else {
-                return "\(count) people"
-            }
+        guard let conversation = convDetailVM.conversation else { return "Chat" }
+        let count = conversation.participants.count
+        if count == 2 {
+            guard let currentUserId = authVM.user?.id else { return "Chat" }
+            let friendId = conversation.participants.first { $0 != currentUserId } ?? "Unknown"
+            return userLookupVM.username(for: friendId)
+        } else if count == 1 {
+            return authVM.user?.username ?? "Chat"
+        } else {
+            return "\(count) people"
         }
-        return "Chat"
     }
     
     var body: some View {
         VStack {
-            // Use ScrollViewReader to scroll programmatically.
+            // Use ScrollViewReader to allow programmatic scrolling.
             ScrollViewReader { scrollProxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(spacing: 12) {
                         ForEach(chatVM.messages) { message in
                             messageBubble(message)
-                                .id(message.id)
-                                // When the oldest message appears, load more if available.
-                                .onAppear {
-                                    if message.id == chatVM.messages.first?.id {
-                                        chatVM.loadMoreMessages()
-                                    }
-                                }
+                                .id(message.id) // Tag each message view for scrolling.
                         }
                     }
                     .padding()
                 }
-                .onAppear {
-                    DispatchQueue.main.async {
-                        if let lastMessage = chatVM.messages.last {
-                            scrollProxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
+                .onChange(of: chatVM.messages) {
+                    scrollToBottom(using: scrollProxy)
                 }
-                .onChange(of: chatVM.messages.count) {
-                    if let lastMessage = chatVM.messages.last {
-                        withAnimation {
-                            scrollProxy.scrollTo(lastMessage.id, anchor: .bottom)
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+                    if let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                            scrollToBottom(using: scrollProxy)
                         }
                     }
                 }
@@ -102,14 +92,26 @@ struct ChatView: View {
             ConversationInfoView(conversationId: conversationId)
                 .environmentObject(authVM)
         }
-        .onAppear {
-            if let _ = authVM.user {
-                // If needed, you can fetch additional user data here.
+    }
+    
+    /// Scrolls the view to the last message.
+    private func scrollToBottom(using proxy: ScrollViewProxy) {
+        print("scrolling to bottom")
+        guard let lastMessage = chatVM.messages.last else { return }
+        if(!initialLoadCompleted) {
+            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            initialLoadCompleted = true
+            return
+        }
+        print("with animation")
+        DispatchQueue.main.async {
+            withAnimation {
+                proxy.scrollTo(lastMessage.id, anchor: .bottom)
             }
         }
     }
     
-    /// A helper to build a single message bubble.
+    /// Builds a message bubble.
     private func messageBubble(_ message: Message) -> some View {
         let isCurrentUser = (message.senderId == authVM.user?.id)
         let senderName = userLookupVM.username(for: message.senderId)
@@ -121,13 +123,11 @@ struct ChatView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
             Text(message.text)
                 .padding()
                 .background(isCurrentUser ? Color.blue : Color.gray.opacity(0.2))
                 .foregroundColor(isCurrentUser ? .white : .primary)
                 .cornerRadius(12)
-            
             Text(dateText)
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -135,6 +135,7 @@ struct ChatView: View {
         .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
     }
     
+    /// Formats a Firestore timestamp into a time string.
     private func formattedDate(_ timestamp: Timestamp) -> String {
         let date = timestamp.dateValue()
         let formatter = DateFormatter()
