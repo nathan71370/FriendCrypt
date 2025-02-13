@@ -16,6 +16,7 @@ extension Notification.Name {
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
+    var pendingDeepLink: DeepLink?
     
     func application(
         _ application: UIApplication,
@@ -87,12 +88,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         print("User tapped notification: \(userInfo)")
         
         if let conversationId = userInfo["conversationId"] as? String {
-            NotificationCenter.default.post(
-                name: .navigateToConversation,
-                object: nil,
-                userInfo: ["conversationId": conversationId]
-            )
+            let deepLink = DeepLink.conversation(id: conversationId)
             
+            if Thread.isMainThread {
+                NavigationRouter.shared.navigate(to: deepLink)
+            } else {
+                DispatchQueue.main.async {
+                    NavigationRouter.shared.navigate(to: deepLink)
+                }
+            }
+            
+            pendingDeepLink = deepLink
             UNUserNotificationCenter.current().getDeliveredNotifications { notifications in
                 let idsToRemove = notifications.filter {
                     if let convoId = $0.request.content.userInfo["conversationId"] as? String {

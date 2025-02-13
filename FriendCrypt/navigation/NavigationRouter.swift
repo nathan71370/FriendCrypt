@@ -9,13 +9,20 @@
 import SwiftUI
 
 final class NavigationRouter: ObservableObject {
+    static let shared = NavigationRouter()
     @Published var path = NavigationPath()
+    
+    // A pending deep link that gets processed on launch.
+    var pendingDeepLink: DeepLink? {
+        didSet {
+            if let link = pendingDeepLink {
+                path.append(link)
+                pendingDeepLink = nil
+            }
+        }
+    }
     
     func navigate(to link: DeepLink) {
         path.append(link)
-    }
-    
-    func reset() {
-        path.removeLast(path.count)
     }
 }

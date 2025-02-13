@@ -4,14 +4,14 @@
 //
 //  Created by Nathan Mercier on 07/02/2025.
 //
-
 import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var authVM = AuthViewModel.shared
     @StateObject var conversationsVM = ConversationsViewModel()
     @StateObject var friendVM = FriendViewModel()
-    @StateObject var router = NavigationRouter() // our navigation router
+    
+    @EnvironmentObject var router: NavigationRouter
     
     @State private var showFriend = false
     @State private var showNewConversation = false
@@ -24,7 +24,7 @@ struct HomeView: View {
                     NavigationLink(value: DeepLink.conversation(id: convo.id ?? "")) {
                         VStack(alignment: .leading) {
                             if convo.participants.count == 2 {
-                                Text("\(friendVM.friendName(for: convo))")
+                                Text(friendVM.friendName(for: convo))
                                     .font(.headline)
                             } else if convo.participants.count == 1 {
                                 Text(authVM.user?.username ?? "Chat")
