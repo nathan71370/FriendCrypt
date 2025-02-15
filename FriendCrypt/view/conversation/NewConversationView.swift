@@ -152,7 +152,6 @@ struct NewConversationView: View {
                 }
                 let conversationData: [String: Any] = [
                     "participants": participants,
-                    "lastMessage": "",
                     "timestamp": Timestamp()
                 ]
                 db.collection("conversations").addDocument(data: conversationData) { error in

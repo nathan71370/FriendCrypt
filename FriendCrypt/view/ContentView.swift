@@ -13,6 +13,7 @@ struct ContentView: View {
     @ObservedObject var authVM = AuthViewModel.shared
     @StateObject var router = NavigationRouter.shared
     @StateObject var friendVM = FriendViewModel()
+    @StateObject var conversationsVM = ConversationsViewModel()
     
     var body: some View {
         Group {
@@ -24,6 +25,7 @@ struct ContentView: View {
                         HomeView()
                             .environmentObject(router)
                             .environmentObject(friendVM)
+                            .environmentObject(conversationsVM)
                             .onAppear {
                                 if let pending = appDelegate.pendingDeepLink {
                                     router.navigate(to: pending)
@@ -41,11 +43,18 @@ struct ContentView: View {
         .onAppear {
             if let user = authVM.user {
                 friendVM.fetchFriends(for: user)
+                conversationsVM.startListening(for: user)
             }
         }
         .onChange(of: authVM.user?.id) {
             if let user = authVM.user {
                 friendVM.fetchFriends(for: user)
+                conversationsVM.startListening(for: user)
+            }
+        }
+        .onReceive(authVM.$user) { user in
+            if let user = user {
+                conversationsVM.startListening(for: user)
             }
         }
     }

@@ -9,7 +9,7 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var authVM = AuthViewModel.shared
-    @StateObject var conversationsVM = ConversationsViewModel()
+    @EnvironmentObject var conversationsVM: ConversationsViewModel
     @EnvironmentObject var friendVM: FriendViewModel
     @EnvironmentObject var router: NavigationRouter
     @State private var showFriend = false
@@ -22,18 +22,6 @@ struct HomeView: View {
                 loadingView
             } else {
                 conversationsNavigationStack
-            }
-        }
-        .onAppear {
-            if let currentUser = authVM.user {
-                conversationsVM.startListening(for: currentUser)
-            }
-        }
-        .onReceive(authVM.$user) { user in
-            if let user = user {
-                conversationsVM.startListening(for: user)
-            } else {
-                conversationsVM.stopListening()
             }
         }
     }
@@ -50,7 +38,7 @@ struct HomeView: View {
     private var conversationsNavigationStack: some View {
         NavigationStack(path: $router.path) {
             List {
-                ForEach(Array(conversationsVM.conversations.values), id: \.id) { convo in
+                ForEach(Array(conversationsVM.sortedConversations), id: \.id) { convo in
                     NavigationLink(value: DeepLink.conversation(id: convo.id ?? "")) {
                         conversationRow(for: convo)
                     }
@@ -95,20 +83,7 @@ struct HomeView: View {
     // MARK: - Conversation Row
     
     private func conversationRow(for convo: Conversation) -> some View {
-        VStack(alignment: .leading) {
-            if convo.participants.count == 2 {
-                Text(friendVM.friendName(for: convo))
-                    .font(.headline)
-            } else if convo.participants.count == 1 {
-                Text(authVM.user?.username ?? "Chat")
-                    .font(.headline)
-            } else {
-                Text("\(convo.participants.count) people")
-                    .font(.headline)
-            }
-            Text(convo.lastMessage)
-                .font(.subheadline)
-        }
+        ConversationRowView(conversation: convo)
     }
     
     // MARK: - Toolbar Content

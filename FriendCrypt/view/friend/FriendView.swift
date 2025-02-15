@@ -64,7 +64,7 @@ struct FriendView: View {
                 }
             }
             .sheet(isPresented: $showAddFriend) {
-                AddFriendView()
+                AddFriendView().environmentObject(authVM)
             }
             .sheet(isPresented: $showFriendRequests) {
                 FriendRequestsView().environmentObject(authVM)
@@ -76,7 +76,6 @@ struct FriendView: View {
                     primaryButton: .destructive(Text("Delete")) {
                         if let currentUser = authVM.user, let friendID = friend.id {
                             friendVM.deleteFriend(friend: friend, currentUser: currentUser)
-                            // Update the current user's friend list locally
                             var updatedUser = currentUser
                             updatedUser.friends.removeAll { $0 == friendID }
                             authVM.user = updatedUser

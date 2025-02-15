@@ -72,12 +72,11 @@ class ChatViewModel: ObservableObject {
                                  text: text,
                                  timestamp: Timestamp())
         do {
-            _ = try db.collection("conversations").document(conversationId)
+            let newMessageDb = try db.collection("conversations").document(conversationId)
                 .collection("messages").addDocument(from: newMessage)
             
-            // Optionally update conversation metadata.
             db.collection("conversations").document(conversationId).updateData([
-                "lastMessage": text,
+                "lastMessageId": newMessageDb.documentID,
                 "timestamp": Timestamp()
             ])
         } catch {

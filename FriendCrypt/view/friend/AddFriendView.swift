@@ -17,6 +17,7 @@ struct AlertData: Identifiable {
 
 struct AddFriendView: View {
     @Environment(\.presentationMode) var presentationMode
+    @EnvironmentObject var authVM: AuthViewModel
     @State private var friendUsername = ""
     @State private var alertData: AlertData? = nil
     
@@ -121,7 +122,7 @@ struct AddFriendView: View {
                     return
                 }
                 
-                if (friendDoc["friend_requests"] as? [String] ?? []).contains(currentUser.uid) {
+                if authVM.user!.friend_requests.contains(friendDoc.documentID) {
                     // The target user has already sent you a friend request, so auto-accept for both sides.
                     autoAcceptMutualRequest(currentUserId: currentUser.uid, friendId: friendDoc.documentID)
                     alertData = AlertData(

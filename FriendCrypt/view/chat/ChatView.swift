@@ -16,17 +16,19 @@ struct ChatView: View {
     @ObservedObject private var authVM = AuthViewModel.shared
     @EnvironmentObject private var conversationVM: ConversationsViewModel
     @EnvironmentObject var friendVM: FriendViewModel
-
+    
     @State private var showInfoSheet = false
     @State private var initialLoadCompleted = false
-
+    
     init(conversationId: String) {
         self.conversationId = conversationId
         _chatVM = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId))
     }
     
     private var navigationTitle: String {
-        let conversation = conversationVM.conversation(for: self.conversationId)
+        guard let conversation = conversationVM.conversation(for: self.conversationId) else {
+            return "Chat"
+        }
         if conversation.participants.count == 2 {
             return friendVM.friendName(for: conversation)
         } else if conversation.participants.count == 1 {
@@ -55,6 +57,9 @@ struct ChatView: View {
             ConversationInfoView(conversationId: conversationId)
                 .environmentObject(authVM)
         }
+        .onDisappear {
+            NavigationRouter.shared.clearCurrentConversation()
+        }
     }
     
     private var chatContent: some View {
@@ -62,9 +67,26 @@ struct ChatView: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     VStack(spacing: 12) {
-                        ForEach(chatVM.messages) { message in
-                            messageBubble(message)
+                        // Retrieve the conversation (if available) to know the participant count.
+                        let conversation = conversationVM.conversation(for: conversationId)
+                        let participantsCount = conversation?.participants.count ?? 2
+                        
+                        // Use enumerated messages to conditionally insert date headers.
+                        ForEach(Array(chatVM.messages.enumerated()), id: \.element.id) { index, message in
+                            VStack(spacing: 4) {
+                                if shouldShowDateHeader(at: index) {
+                                    Text(formattedDateHeader(message.timestamp))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                MessageBubbleView(
+                                    message: message,
+                                    isCurrentUser: message.senderId == authVM.user?.id,
+                                    senderName: friendVM.friends[message.senderId]?.username ?? "Loading...",
+                                    conversationParticipantsCount: participantsCount
+                                )
                                 .id(message.id)
+                            }
                         }
                     }
                     .padding()
@@ -83,12 +105,15 @@ struct ChatView: View {
             HStack {
                 TextField("Message...", text: $messageText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                Button("Send") {
+                Button {
                     let trimmed = messageText.trimmingCharacters(in: .whitespaces)
                     if !trimmed.isEmpty {
                         chatVM.sendMessage(text: trimmed)
                         messageText = ""
                     }
+                }
+                label: {
+                    Image(systemName: "paperplane")
                 }
             }
             .padding()
@@ -109,34 +134,24 @@ struct ChatView: View {
         }
     }
     
-    private func messageBubble(_ message: Message) -> some View {
-        let isCurrentUser = (message.senderId == authVM.user?.id)
-        let senderName = friendVM.friends[message.senderId]?.username ?? "Loading..."
-        let dateText = formattedDate(message.timestamp)
+    /// Determines whether to show a date header before the message at the given index.
+    private func shouldShowDateHeader(at index: Int) -> Bool {
+        // Always show a header for the very first message.
+        if index == 0 { return true }
         
-        return VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
-            if !isCurrentUser {
-                Text(senderName)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Text(message.text)
-                .padding()
-                .background(isCurrentUser ? Color.blue : Color.gray.opacity(0.2))
-                .foregroundColor(isCurrentUser ? .white : .primary)
-                .cornerRadius(12)
-            Text(dateText)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
+        let currentMessageDate = chatVM.messages[index].timestamp.dateValue()
+        let previousMessageDate = chatVM.messages[index - 1].timestamp.dateValue()
+        let calendar = Calendar.current
+        
+        // Show a header if the current message is not on the same day as the previous one.
+        return !calendar.isDate(currentMessageDate, inSameDayAs: previousMessageDate)
     }
     
-    private func formattedDate(_ timestamp: Timestamp) -> String {
+    /// Formats the header date (for example, "Sat Feb 15").
+    private func formattedDateHeader(_ timestamp: Timestamp) -> String {
         let date = timestamp.dateValue()
         let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
+        formatter.dateFormat = "EEE MMM dd"
         return formatter.string(from: date)
     }
 }

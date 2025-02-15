@@ -12,19 +12,20 @@ import FirebaseFirestore
 class ConversationsViewModel: ObservableObject {
     @Published var conversations: [String: Conversation] = [:]
     private var listener: ListenerRegistration?
+    private let db = Firestore.firestore();
     
     /// Call this when you have a valid user to start listening for conversations.
     func startListening(for user: ChatUser) {
         listener?.remove()
         listener = nil
+        conversations = [:]
         
         guard let currentUserID = user.id else {
             return
         }
         
         print("Starting conversation listener for user: \(currentUserID)")
-        let query = Firestore.firestore()
-            .collection("conversations")
+        let query = db.collection("conversations")
             .whereField("participants", arrayContains: currentUserID)
             .order(by: "timestamp", descending: true)
         
@@ -52,16 +53,10 @@ class ConversationsViewModel: ObservableObject {
         }
     }
     
-    /// Stops the listener.
-    func stopListening() {
-        listener?.remove()
-        listener = nil
-    }
-    
     /// Removes the current user from a conversation.
     func quitConversation(convo: Conversation, currentUser: ChatUser) {
         guard let convoId = convo.id, let currentUserId = currentUser.id else { return }
-        let convoRef = Firestore.firestore().collection("conversations").document(convoId)
+        let convoRef = db.collection("conversations").document(convoId)
         
         convoRef.getDocument { snapshot, error in
             if let error = error {
@@ -93,11 +88,28 @@ class ConversationsViewModel: ObservableObject {
     }
     
     /// Returns the conversation for a given conversation id.
-    func conversation(for convoId: String) -> Conversation {
-        return self.conversations[convoId]!
+    func conversation(for convoId: String) -> Conversation? {
+        return self.conversations[convoId]
     }
     
-    deinit {
-        stopListening()
+    /// Retrieve the lastMessage from conversation
+    func lastMessage(conversation: Conversation) async throws -> Message? {
+        guard let conversationId = conversation.id, let messageId = conversation.lastMessageId else {
+            print("Either conversationId or messageId is nil.")
+            return nil
+        }
+        
+        let messageRef = db.collection("conversations").document(conversationId)
+            .collection("messages").document(messageId)
+        
+        let snapshot = try await messageRef.getDocument()
+        return try snapshot.data(as: Message.self)
+    }
+    
+    
+    var sortedConversations: [Conversation] {
+        return conversations.values.sorted {
+            $0.timestamp.dateValue() > $1.timestamp.dateValue()
+        }
     }
 }

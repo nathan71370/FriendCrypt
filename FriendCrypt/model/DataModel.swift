@@ -21,7 +21,7 @@ struct ChatUser: Identifiable, Codable {
 struct Conversation: Identifiable, Codable {
     @DocumentID var id: String?
     var participants: [String] 
-    var lastMessage: String
+    var lastMessageId: String?
     var timestamp: Timestamp
 }
 

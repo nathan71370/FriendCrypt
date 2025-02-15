@@ -6,6 +6,7 @@
 //
 import SwiftUI
 import FirebaseFirestore
+import FirebaseMessaging
 import FirebaseAuth
 
 class AuthViewModel: ObservableObject {
@@ -15,10 +16,11 @@ class AuthViewModel: ObservableObject {
     @Published var isLoggedIn = false
     @Published var signupError: String? = nil  // To hold signup error messages
     
+    private var authStateListenerHandle: AuthStateDidChangeListenerHandle?
     private var userListener: ListenerRegistration?
     
     init() {
-        Auth.auth().addStateDidChangeListener { auth, fbUser in
+        authStateListenerHandle = Auth.auth().addStateDidChangeListener { auth, fbUser in
             if let fbUser = fbUser {
                 self.isLoggedIn = true
                 // Instead of a single getDocument, set up a snapshot listener:
@@ -97,7 +99,30 @@ class AuthViewModel: ObservableObject {
                 do {
                     try db.collection("users")
                         .document(result.user.uid)
-                        .setData(from: newUser)
+                        .setData(from: newUser) { err in
+                            if let err = err {
+                                DispatchQueue.main.async {
+                                    self.signupError = "Error writing user data: \(err.localizedDescription)"
+                                }
+                            } else {
+                                // Now that the user is created, fetch and update the FCM token:
+                                Messaging.messaging().token { token, error in
+                                    if let error = error {
+                                        print("Error fetching FCM registration token: \(error)")
+                                    } else if let token = token {
+                                        db.collection("users")
+                                            .document(result.user.uid)
+                                            .updateData(["fcmToken": token]) { updateError in
+                                                if let updateError = updateError {
+                                                    print("Error updating FCM token: \(updateError)")
+                                                } else {
+                                                    print("FCM token updated successfully after sign up.")
+                                                }
+                                            }
+                                    }
+                                }
+                            }
+                        }
                 } catch {
                     DispatchQueue.main.async {
                         self.signupError = "Error writing user data: \(error.localizedDescription)"
