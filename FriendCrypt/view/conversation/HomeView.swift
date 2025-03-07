@@ -66,7 +66,7 @@ struct HomeView: View {
             .navigationDestination(for: DeepLink.self) { link in
                 switch link {
                 case .conversation(let id):
-                    ChatView(conversationId: id)
+                    ChatView(conversationId: id, conversationsViewModel: conversationsVM)
                         .environmentObject(friendVM)
                         .environmentObject(conversationsVM)
                 }
@@ -83,7 +83,7 @@ struct HomeView: View {
     // MARK: - Conversation Row
     
     private func conversationRow(for convo: Conversation) -> some View {
-        ConversationRowView(conversation: convo)
+        ConversationRowView(conversation: convo).environmentObject(conversationsVM).environmentObject(friendVM).environmentObject(authVM)
     }
     
     // MARK: - Toolbar Content

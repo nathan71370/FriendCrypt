@@ -1,10 +1,3 @@
-//
-//  ChatView.swift
-//  Friendly
-//
-//  Created by Nathan Mercier on 07/02/2025.
-//
-
 import SwiftUI
 import FirebaseFirestore
 
@@ -12,7 +5,6 @@ struct ChatView: View {
     let conversationId: String
     
     @StateObject private var chatVM: ChatViewModel
-    @State private var messageText = ""
     @ObservedObject private var authVM = AuthViewModel.shared
     @EnvironmentObject private var conversationVM: ConversationsViewModel
     @EnvironmentObject var friendVM: FriendViewModel
@@ -20,9 +12,9 @@ struct ChatView: View {
     @State private var showInfoSheet = false
     @State private var initialLoadCompleted = false
     
-    init(conversationId: String) {
+    init(conversationId: String, conversationsViewModel: ConversationsViewModel) {
         self.conversationId = conversationId
-        _chatVM = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId))
+        _chatVM = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId, conversationsViewModel: conversationsViewModel))
     }
     
     private var navigationTitle: String {
@@ -62,61 +54,111 @@ struct ChatView: View {
         }
     }
     
+    // Breaking up the chatContent into smaller components
     private var chatContent: some View {
         VStack {
-            ScrollViewReader { scrollProxy in
-                ScrollView {
-                    VStack(spacing: 12) {
-                        // Retrieve the conversation (if available) to know the participant count.
-                        let conversation = conversationVM.conversation(for: conversationId)
-                        let participantsCount = conversation?.participants.count ?? 2
-                        
-                        // Use enumerated messages to conditionally insert date headers.
-                        ForEach(Array(chatVM.messages.enumerated()), id: \.element.id) { index, message in
-                            VStack(spacing: 4) {
-                                if shouldShowDateHeader(at: index) {
-                                    Text(formattedDateHeader(message.timestamp))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                MessageBubbleView(
-                                    message: message,
-                                    isCurrentUser: message.senderId == authVM.user?.id,
-                                    senderName: friendVM.friends[message.senderId]?.username ?? "Loading...",
-                                    conversationParticipantsCount: participantsCount
-                                )
-                                .id(message.id)
-                            }
-                        }
-                    }
-                    .padding()
-                }
-                .onChange(of: chatVM.messages) {
-                    scrollToBottom(using: scrollProxy)
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
-                    if let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                            scrollToBottom(using: scrollProxy)
-                        }
-                    }
-                }
+            messagesScrollView
+            messageInputBar
+        }
+    }
+    
+    // Extract messages scroll view to a separate component
+    private var messagesScrollView: some View {
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                messagesContent(scrollProxy: scrollProxy)
             }
-            HStack {
-                TextField("Message...", text: $messageText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                Button {
-                    let trimmed = messageText.trimmingCharacters(in: .whitespaces)
-                    if !trimmed.isEmpty {
-                        chatVM.sendMessage(text: trimmed)
-                        messageText = ""
-                    }
-                }
-                label: {
-                    Image(systemName: "paperplane")
-                }
+            .onChange(of: chatVM.messages) {
+                scrollToBottom(using: scrollProxy)
             }
-            .padding()
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+                handleKeyboardNotification(notification, scrollProxy: scrollProxy)
+            }
+            .onAppear {
+                setupMlsGroup()
+            }
+        }
+    }
+    
+    // Further breaking down messages content
+    private func messagesContent(scrollProxy: ScrollViewProxy) -> some View {
+        let conversation = conversationVM.conversation(for: conversationId)
+        let participantsCount = conversation?.participants.count ?? 2
+        
+        return VStack(spacing: 12) {
+            ForEach(Array(chatVM.messages.enumerated()), id: \.element.id) { index, message in
+                messageRow(index: index, message: message, participantsCount: participantsCount)
+                    .id(message.id)
+            }
+        }
+        .padding()
+    }
+    
+    // Extract individual message row
+    private func messageRow(index: Int, message: Message, participantsCount: Int) -> some View {
+        VStack(spacing: 4) {
+            if shouldShowDateHeader(at: index) {
+                Text(formattedDateHeader(message.timestamp))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            MessageBubbleView(
+                message: message,
+                isCurrentUser: message.senderId == authVM.user?.id,
+                senderName: friendVM.friends[message.senderId]?.username ?? "Loading...",
+                conversationParticipantsCount: participantsCount,
+                displayText: chatVM.getDisplayText(for: message)
+            )
+        }
+    }
+    
+    private var messageInputBar: some View {
+        HStack {
+            let lineHeight = UIFont.preferredFont(forTextStyle: .body).lineHeight
+            GrowingTextEditor(
+                text: $chatVM.messageText,
+                placeholder: "Message...",
+                minHeight: lineHeight * 2,
+                maxHeight: lineHeight * 4
+            )
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(8)
+            
+            Button {
+                sendMessage()
+            } label: {
+                Image(systemName: "paperplane")
+            }
+        }
+        .padding()
+    }
+    
+    // Helper methods
+    private func sendMessage() {
+        let trimmed = chatVM.messageText.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty {
+            chatVM.sendMessage()
+            chatVM.messageText = ""
+        }
+    }
+    
+    private func handleKeyboardNotification(_ notification: Notification, scrollProxy: ScrollViewProxy) {
+        if let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double {
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                scrollToBottom(using: scrollProxy)
+            }
+        }
+    }
+    
+    private func setupMlsGroup() {
+        // Check if MLS group exists in the ConversationsViewModel
+        if conversationVM.mlsGroup(for: conversationId) == nil {
+            // Use the current user's identity to restore the group if needed
+            if let userId = authVM.user?.id {
+                // Try to load MLS group for this conversation
+                conversationVM.tryLoadMlsGroup(for: conversationId, userId: userId)
+            }
         }
     }
     
@@ -134,20 +176,15 @@ struct ChatView: View {
         }
     }
     
-    /// Determines whether to show a date header before the message at the given index.
     private func shouldShowDateHeader(at index: Int) -> Bool {
-        // Always show a header for the very first message.
         if index == 0 { return true }
         
         let currentMessageDate = chatVM.messages[index].timestamp.dateValue()
         let previousMessageDate = chatVM.messages[index - 1].timestamp.dateValue()
         let calendar = Calendar.current
-        
-        // Show a header if the current message is not on the same day as the previous one.
         return !calendar.isDate(currentMessageDate, inSameDayAs: previousMessageDate)
     }
     
-    /// Formats the header date (for example, "Sat Feb 15").
     private func formattedDateHeader(_ timestamp: Timestamp) -> String {
         let date = timestamp.dateValue()
         let formatter = DateFormatter()

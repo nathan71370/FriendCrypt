@@ -4,12 +4,6 @@
 //
 //  Created by Nathan Mercier on 07/02/2025.
 //
-//
-//  NewConversationView.swift
-//  Friendly
-//
-//  Created by Nathan Mercier on 07/02/2025.
-//
 
 import SwiftUI
 import FirebaseAuth
@@ -19,12 +13,11 @@ struct NewConversationView: View {
     @Environment(\.presentationMode) var presentationMode
     @Binding var isPresented: Bool
     @ObservedObject var authVM = AuthViewModel.shared
-    // Use the shared FriendViewModel rather than a new instance.
     @EnvironmentObject var friendVM: FriendViewModel
+    @EnvironmentObject var conversationsVM: ConversationsViewModel
+    
     @State private var selectedFriendIDs: Set<String> = []
     @State private var errorMessage: String? = nil
-    
-    private let db = Firestore.firestore()
     
     var body: some View {
         NavigationView {
@@ -61,7 +54,6 @@ struct NewConversationView: View {
                             }
                             .padding()
                         } else {
-                            // Convert dictionary values to an array for display.
                             List(Array(friendVM.friends.values), id: \.id) { friend in
                                 Button(action: {
                                     guard let friendID = friend.id else { return }
@@ -114,53 +106,35 @@ struct NewConversationView: View {
         }
         .onAppear {
             if let currentUser = authVM.user {
-                // This will use the cached friend data if already loaded.
                 friendVM.fetchFriends(for: currentUser)
             }
         }
     }
     
     func startConversation() {
-        guard let currentUser = Auth.auth().currentUser else { return }
+        guard let currentUser = authVM.user, let currentUserId = currentUser.id else {
+            errorMessage = "User not available."
+            return
+        }
         if selectedFriendIDs.isEmpty {
             errorMessage = "Please select at least one friend."
             return
         }
         errorMessage = nil
         
-        let participants = [currentUser.uid] + Array(selectedFriendIDs)
+        var participants = [currentUserId]
+        participants.append(contentsOf: Array(selectedFriendIDs))
         
-        db.collection("conversations")
-            .whereField("participants", arrayContains: currentUser.uid)
-            .getDocuments { snapshot, error in
-                if let error = error {
+        conversationsVM.createConversation(creator:currentUser, participants: participants) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let conversation):
+                    print("Created conversation with ID: \(conversation.id ?? "unknown")")
+                    isPresented = false
+                case .failure(let error):
                     errorMessage = error.localizedDescription
-                    return
-                }
-                if let docs = snapshot?.documents {
-                    for doc in docs {
-                        let data = doc.data()
-                        if let existingParticipants = data["participants"] as? [String] {
-                            let setExisting = Set(existingParticipants)
-                            let setNew = Set(participants)
-                            if setExisting == setNew {
-                                isPresented = false
-                                return
-                            }
-                        }
-                    }
-                }
-                let conversationData: [String: Any] = [
-                    "participants": participants,
-                    "timestamp": Timestamp()
-                ]
-                db.collection("conversations").addDocument(data: conversationData) { error in
-                    if let error = error {
-                        errorMessage = error.localizedDescription
-                    } else {
-                        isPresented = false
-                    }
                 }
             }
+        }
     }
 }
