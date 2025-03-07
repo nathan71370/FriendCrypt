@@ -1,11 +1,11 @@
 //
-//  FriendCrypt-Bridging-Header.h
+//  openmls_ffi.h
 //  FriendCrypt
 //
 //  Created by Nathan Mercier on 16/02/2025.
 //
 
-// include/openmls_ffi.h
+// openmls_ffi.h
 #ifndef OPENMLS_FFI_H
 #define OPENMLS_FFI_H
 
@@ -24,6 +24,7 @@ typedef struct CredentialContext CredentialContext;
 typedef struct KeyPackageContext KeyPackageContext;
 typedef struct WelcomeContext WelcomeContext;
 typedef struct StagedWelcomeContext StagedWelcomeContext;
+typedef struct MlsMessageOutContext MlsMessageOutContext;
 
 // Error handling
 typedef struct {
@@ -40,7 +41,6 @@ uint32_t get_default_ciphersuite(void);
 // Generate credential with key
 FfiResult generate_credential(
     const char* identity,
-    uint32_t ciphersuite_id,
     CredentialContext* out_credential,
     SignerContext* out_signer
 );
@@ -53,7 +53,6 @@ void free_signer(SignerContext context);
 
 // Generate key package
 FfiResult generate_key_package(
-    uint32_t ciphersuite_id,
     const SignerContext* signer,
     const CredentialContext* credential,
     KeyPackageContext* out_key_package
@@ -103,6 +102,9 @@ FfiResult serialize_welcome(
 // Free welcome resources
 void free_welcome(WelcomeContext context);
 
+// Free message out resources
+void free_message_out(MlsMessageOutContext context);
+
 // Free byte buffer
 void free_buffer(uint8_t* buffer, size_t len);
 
@@ -128,6 +130,49 @@ void free_staged_welcome(StagedWelcomeContext context);
 FfiResult complete_group_join(
     StagedWelcomeContext* staged_welcome,
     GroupContext* out_group
+);
+
+// NEW FUNCTIONS FOR ENCRYPTION/DECRYPTION
+
+// Encrypt a message
+FfiResult encrypt_message(
+    GroupContext* group,
+    const SignerContext* signer,
+    const uint8_t* message_data,
+    size_t message_len,
+    uint8_t** out_data,
+    size_t* out_len
+);
+
+// Decrypt a message
+FfiResult decrypt_message(
+    GroupContext* group,
+    const uint8_t* message_data,
+    size_t message_len,
+    uint8_t** out_data,
+    size_t* out_len
+);
+
+// Helper for sending text messages
+FfiResult send_message(
+    GroupContext* group,
+    const char* message_text,
+    uint8_t** out_data,
+    size_t* out_len
+);
+
+// Serialize a key package for storage
+FfiResult serialize_key_package(
+    const KeyPackageContext* key_package,
+    uint8_t** out_data,
+    size_t* out_len
+);
+
+// Deserialize a key package from storage
+FfiResult deserialize_key_package(
+    const uint8_t* data,
+    size_t data_len,
+    KeyPackageContext* out_key_package
 );
 
 #ifdef __cplusplus
